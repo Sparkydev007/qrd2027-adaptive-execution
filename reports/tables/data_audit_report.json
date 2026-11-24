@@ -1,0 +1,156 @@
+{
+  "file_path": "C:\\Users\\Prathmesh Bunde\\qrd2027_adaptive_execution\\data\\raw\\sample_RELIANCE_1min.csv",
+  "total_records": 7520,
+  "unique_trading_days": 20,
+  "all_passed": false,
+  "checks": [
+    {
+      "check_name": "missing_required_columns",
+      "passed": true,
+      "description": "Verify presence of mandatory OHLCV columns",
+      "issue_count": 0,
+      "details": {
+        "missing_columns": []
+      }
+    },
+    {
+      "check_name": "duplicate_timestamps",
+      "passed": true,
+      "description": "Detect duplicate timestamps",
+      "issue_count": 0,
+      "details": {
+        "duplicate_count": 0,
+        "sample_duplicates": []
+      }
+    },
+    {
+      "check_name": "non_monotonic_timestamps",
+      "passed": true,
+      "description": "Ensure timestamps are strictly ascending",
+      "issue_count": 0,
+      "details": {
+        "negative_step_count": 0
+      }
+    },
+    {
+      "check_name": "missing_candles_in_session",
+      "passed": true,
+      "description": "Detect missing intraday 1-minute intervals during regular session",
+      "issue_count": 0,
+      "details": {
+        "total_missing_candles": 0,
+        "days_with_gaps": {}
+      }
+    },
+    {
+      "check_name": "zero_or_negative_prices",
+      "passed": true,
+      "description": "Verify all price records are strictly positive (> 0.0)",
+      "issue_count": 0,
+      "details": {
+        "open": 0,
+        "high": 0,
+        "low": 0,
+        "close": 0
+      }
+    },
+    {
+      "check_name": "negative_or_zero_volume",
+      "passed": true,
+      "description": "Verify volume is non-negative and track zero-volume bars",
+      "issue_count": 0,
+      "details": {
+        "negative_volume_count": 0,
+        "zero_volume_bars": 0
+      }
+    },
+    {
+      "check_name": "high_less_than_low",
+      "passed": true,
+      "description": "Verify High >= Low for every candle",
+      "issue_count": 0,
+      "details": {
+        "violations_count": 0
+      }
+    },
+    {
+      "check_name": "open_close_outside_high_low",
+      "passed": true,
+      "description": "Verify Open and Close are bounded within [Low, High]",
+      "issue_count": 0,
+      "details": {
+        "out_of_range_count": 0
+      }
+    },
+    {
+      "check_name": "extreme_returns",
+      "passed": true,
+      "description": "Flag 1-minute returns exceeding 10.0% threshold",
+      "issue_count": 0,
+      "details": {
+        "extreme_count": 0,
+        "max_1min_abs_log_return": 0.002319564479400556
+      }
+    },
+    {
+      "check_name": "insufficient_trading_history",
+      "passed": false,
+      "description": "Verify historical length meets minimum threshold of 120 days",
+      "issue_count": 100,
+      "details": {
+        "unique_days": 20,
+        "required_min_days": 120
+      }
+    },
+    {
+      "check_name": "low_liquidity_stock",
+      "passed": true,
+      "description": "Ensure Average Daily Volume >= 100,000 shares",
+      "issue_count": 0,
+      "details": {
+        "estimated_adv": 827237.4,
+        "min_adv_threshold": 100000
+      }
+    },
+    {
+      "check_name": "corporate_action_anomalies",
+      "passed": true,
+      "description": "Detect unadjusted overnight price gaps indicating splits or bonus issues",
+      "issue_count": 0,
+      "details": {
+        "anomaly_dates": []
+      }
+    },
+    {
+      "check_name": "timezone_inconsistency",
+      "passed": true,
+      "description": "Verify timestamps are localized to Asia/Kolkata",
+      "issue_count": 0,
+      "details": {
+        "detected_timezone": "UTC+05:30",
+        "expected_timezone": "Asia/Kolkata"
+      }
+    },
+    {
+      "check_name": "data_gaps_during_market_hours",
+      "passed": true,
+      "description": "Detect consecutive intraday gaps exceeding 5 minutes",
+      "issue_count": 0,
+      "details": {
+        "gap_instances": 0,
+        "sample_gaps": []
+      }
+    }
+  ],
+  "summary": {
+    "total_records": 7520,
+    "unique_days": 20,
+    "total_checks": 14,
+    "passed_checks": 13,
+    "failed_checks_count": 1,
+    "failed_checks": [
+      "insufficient_trading_history"
+    ],
+    "overall_status": "FLAGGED"
+  }
+}
