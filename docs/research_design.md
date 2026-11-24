@@ -76,24 +76,26 @@ While optimal execution models originating from Almgren & Chriss (2000), Bertsim
    - Passive queue preference when spread $S_t \ge \bar{S}$.
    - Aggressive market sweep when remaining time is critical ($t \to T$).
 
-## 10. Market-Impact Model
-Following Almgren-Chriss (2000) and Bouchaud et al. (2009):
-- **Temporary Impact (Cost per child slice):**
+## 10. Market-Impact Simulation Assumptions
+Following Almgren-Chriss (2000) and Bouchaud et al. (2009), market impact is incorporated via explicit simulation assumptions (rather than directly fitted from proprietary Level-2 tick logs):
+- **Temporary Impact Simulation Assumption:**
   $$\Delta P_t^{\text{temp}} = \eta \cdot \sigma_t \cdot \left(\frac{q_t}{V_t}\right)^\alpha$$
-  where $\alpha = 0.5$ (the classical empirical square-root law).
-- **Permanent Impact (Persistent shift in mid-price):**
+  where $\alpha = 0.5$ (the classical empirical square-root law) and $\eta = 0.5$.
+- **Permanent Impact Simulation Assumption:**
   $$\Delta P_t^{\text{perm}} = \gamma \cdot \sigma_t \cdot \frac{q_t}{V_t}$$
-  where $\gamma$ is the permanent price impact coefficient.
+  where $\gamma = 0.10$ is the permanent price impact fraction.
 
-## 11. Transaction-Cost Model
-Reflects Indian statutory cash equity institutional schedule:
-- **Brokerage / Execution fee:** 1.5 bps
-- **Securities Transaction Tax (STT):** 10 bps on delivery buy/sell; 2.5 bps intraday.
-- **Exchange Turnover Charges (NSE):** 0.325 bps
-- **SEBI Turnover Charges:** 0.01 bps
-- **Stamp Duty:** 1.5 bps on buy delivery.
-- **Goods and Services Tax (GST):** 18% on (brokerage + exchange charges + SEBI charges).
-- **Configurable Standard Model:** Flat 5.0 bps baseline plus exact tax breakdown.
+## 11. Transaction-Cost Model & Programmatic Schedule
+Reflects Indian statutory cash equity institutional schedule with total cost calculated programmatically:
+- **Brokerage / Execution fee:** 1.500 bps
+- **Exchange Turnover Charges (NSE Cash):** 0.325 bps
+- **SEBI Turnover Charges:** 0.010 bps
+- **Goods and Services Tax (GST, 18% on brokerage + exchange + SEBI):** $0.18 \times (1.50 + 0.325 + 0.01) = 0.3303$ bps
+- **Stamp Duty (buy delivery):** 1.500 bps
+- **Securities Transaction Tax (STT):** 2.500 bps
+- **Total Programmatic Cost:**
+  $$\text{Total}_{\text{itemized}} = 1.50 + 0.325 + 0.01 + 0.3303 + 1.50 + 2.50 = 6.1653\text{ bps}$$
+- **Configurable Standard Model:** Flat 5.0 bps baseline comparison parameter.
 
 ## 12. Evaluation Metrics
 1. Implementation Shortfall (IS) in basis points:

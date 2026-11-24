@@ -34,7 +34,7 @@ def multi_day_ohlcv_df() -> pd.DataFrame:
 
     for day in days:
         day_str = day.strftime("%Y-%m-%d")
-        times = pd.date_range(f"{day_str} 09:15:00", f"{day_str} 15:30:00", freq="1min", tz="Asia/Kolkata")
+        times = pd.date_range(f"{day_str} 09:15:00", periods=375, freq="1min", tz="Asia/Kolkata")
         n = len(times)
         # U-shaped volume
         u = 1.0 + 2.0 * ((np.arange(n) - n / 2) / (n / 2)) ** 2
@@ -85,8 +85,30 @@ def test_estimate_volatility_percentiles(multi_day_ohlcv_df):
     assert pcts["p40"] > 0.0
 
 
+def test_transaction_cost_schedule_sum_consistency():
+    """Test 7: Verify total transaction cost programmatically equals the exact sum of components."""
+    schedule = estimate_transaction_cost_schedule()
+
+    # Sum of itemized components
+    expected_sum = (
+        schedule["brokerage_bps"]
+        + schedule["exchange_charges_bps"]
+        + schedule["sebi_turnover_bps"]
+        + schedule["gst_bps"]
+        + schedule["stamp_duty_bps"]
+        + schedule["stt_bps"]
+    )
+
+    # Programmatic total must strictly match the component sum
+    assert np.isclose(schedule["total_itemized_bps"], expected_sum, atol=1e-5)
+
+    # Verify GST is 18% of taxable services (brokerage + exchange charges + SEBI charges)
+    taxable = schedule["brokerage_bps"] + schedule["exchange_charges_bps"] + schedule["sebi_turnover_bps"]
+    assert np.isclose(schedule["gst_bps"], round(0.18 * taxable, 4), atol=1e-5)
+
+
 def test_estimate_microstructure_parameters():
-    """Test spread, depth, impact, and cost parameters match configuration."""
+    """Test spread, depth, impact, and cost parameters match configuration and are labeled assumptions."""
     cfg = get_config()
     spread_p = estimate_spread_parameters(cfg)
     depth_p = estimate_depth_parameters(cfg)
@@ -99,14 +121,22 @@ def test_estimate_microstructure_parameters():
     assert temp_p["exponent_alpha"] == 0.5
     assert perm_p["fraction_gamma"] == 0.10
     assert costs["configured_baseline_bps"] == 5.0
+    assert costs["total_itemized_bps"] > 0
 
 
 def test_generate_and_save_calibration_report(multi_day_ohlcv_df):
-    """Test full calibration summary generation and serialization."""
+    """Test full calibration summary generation and serialization with relabeled assumptions."""
     report = generate_calibration_summary(multi_day_ohlcv_df, ticker="RELIANCE")
     assert report.ticker == "RELIANCE"
     assert report.total_trading_days == 5
     assert report.volume_profile.sum_check > 0.99
+    # Verify relabeled simulation assumptions
+    assert report.simulation_assumptions.assumed_spread_method == "fixed_bps"
+    assert report.simulation_assumptions.assumed_baseline_spread_bps == 5.0
+    assert report.simulation_assumptions.assumed_depth_multiplier == 0.05
+    assert report.simulation_assumptions.assumed_temporary_impact_exponent == 0.5
+    assert report.simulation_assumptions.assumed_permanent_impact_fraction_gamma == 0.10
+    assert "assumption_note" in report.to_dict()["simulation_assumptions"]
 
     with tempfile.TemporaryDirectory() as tmp_dir:
         json_path = save_calibration_report(report, output_dir=tmp_dir, format_type="json")

@@ -22,8 +22,8 @@ from src.data_audit import (
 
 @pytest.fixture
 def clean_audit_df() -> pd.DataFrame:
-    """Fixture providing clean audit DataFrame."""
-    times = pd.date_range("2024-01-01 09:15:00", "2024-01-01 15:30:00", freq="1min", tz="Asia/Kolkata")
+    """Fixture providing clean audit DataFrame for 375 continuous execution intervals."""
+    times = pd.date_range("2024-01-01 09:15:00", periods=375, freq="1min", tz="Asia/Kolkata")
     n = len(times)
     df = pd.DataFrame({
         "timestamp": times,

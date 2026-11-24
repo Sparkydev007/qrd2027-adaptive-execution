@@ -28,8 +28,8 @@ from src.data_loader import (
 
 @pytest.fixture
 def synthetic_ohlcv_df() -> pd.DataFrame:
-    """Fixture providing clean synthetic 1-minute OHLCV data."""
-    times = pd.date_range("2024-01-01 09:15:00", "2024-01-01 15:30:00", freq="1min", tz="Asia/Kolkata")
+    """Fixture providing clean synthetic 1-minute OHLCV data for 375 continuous minutes."""
+    times = pd.date_range("2024-01-01 09:15:00", periods=375, freq="1min", tz="Asia/Kolkata")
     n = len(times)
     np.random.seed(123)
     closes = 2500.0 + np.cumsum(np.random.normal(0, 1.0, n))
@@ -87,20 +87,23 @@ def test_sort_by_timestamp():
 
 
 def test_filter_market_hours(synthetic_ohlcv_df):
-    """Test 5: Market-hours filtering retains only 09:15 to 15:30 IST."""
+    """Test 5: Market-hours filtering retains 375 continuous minutes (09:15-15:29) excluding 15:30 boundary."""
     parsed = parse_timestamps(synthetic_ohlcv_df, target_timezone="Asia/Kolkata")
-    # Add pre-market and post-market rows
+    # Add pre-market and post-market rows including boundary 15:30
     pre_row = parsed.iloc[[0]].copy()
     pre_row["timestamp"] = pd.to_datetime("2024-01-01 09:00:00").tz_localize("Asia/Kolkata")
+    boundary_close_row = parsed.iloc[[0]].copy()
+    boundary_close_row["timestamp"] = pd.to_datetime("2024-01-01 15:30:00").tz_localize("Asia/Kolkata")
     post_row = parsed.iloc[[0]].copy()
     post_row["timestamp"] = pd.to_datetime("2024-01-01 15:45:00").tz_localize("Asia/Kolkata")
-    extended = pd.concat([pre_row, parsed, post_row], ignore_index=True)
+    extended = pd.concat([pre_row, parsed, boundary_close_row, post_row], ignore_index=True)
 
-    filtered = filter_market_hours(extended, start_time="09:15", end_time="15:30")
-    assert len(filtered) == len(parsed)
+    filtered = filter_market_hours(extended, start_time="09:15", end_time="15:30", exclude_boundary_close=True)
+    assert len(filtered) == 375
     times = filtered["timestamp"].dt.time
     assert (times >= pd.to_datetime("09:15").time()).all()
-    assert (times <= pd.to_datetime("15:30").time()).all()
+    assert (times < pd.to_datetime("15:30").time()).all()
+    assert (times <= pd.to_datetime("15:29").time()).all()
 
 
 def test_calculate_log_returns(synthetic_ohlcv_df):

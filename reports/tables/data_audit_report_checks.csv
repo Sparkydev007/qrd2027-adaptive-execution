@@ -2,14 +2,14 @@ check_name,passed,description,issue_count,details
 missing_required_columns,True,Verify presence of mandatory OHLCV columns,0,{'missing_columns': []}
 duplicate_timestamps,True,Detect duplicate timestamps,0,"{'duplicate_count': 0, 'sample_duplicates': []}"
 non_monotonic_timestamps,True,Ensure timestamps are strictly ascending,0,{'negative_step_count': 0}
-missing_candles_in_session,True,Detect missing intraday 1-minute intervals during regular session,0,"{'total_missing_candles': 0, 'days_with_gaps': {}}"
+missing_candles_in_session,True,"Detect missing continuous 1-minute intervals (expected 375 bars/day, 09:15-15:29)",0,"{'total_missing_candles': 0, 'expected_per_day': 375, 'days_with_gaps': {}}"
 zero_or_negative_prices,True,Verify all price records are strictly positive (> 0.0),0,"{'open': 0, 'high': 0, 'low': 0, 'close': 0}"
 negative_or_zero_volume,True,Verify volume is non-negative and track zero-volume bars,0,"{'negative_volume_count': 0, 'zero_volume_bars': 0}"
 high_less_than_low,True,Verify High >= Low for every candle,0,{'violations_count': 0}
 open_close_outside_high_low,True,"Verify Open and Close are bounded within [Low, High]",0,{'out_of_range_count': 0}
-extreme_returns,True,Flag 1-minute returns exceeding 10.0% threshold,0,"{'extreme_count': 0, 'max_1min_abs_log_return': 0.002319564479400556}"
+extreme_returns,True,Flag 1-minute returns exceeding 10.0% threshold,0,"{'extreme_count': 0, 'max_1min_abs_log_return': 0.002167575237053642}"
 insufficient_trading_history,False,Verify historical length meets minimum threshold of 120 days,100,"{'unique_days': 20, 'required_min_days': 120}"
-low_liquidity_stock,True,"Ensure Average Daily Volume >= 100,000 shares",0,"{'estimated_adv': 827237.4, 'min_adv_threshold': 100000}"
+low_liquidity_stock,True,"Ensure Average Daily Volume >= 100,000 shares",0,"{'estimated_adv': 825213.5, 'min_adv_threshold': 100000}"
 corporate_action_anomalies,True,Detect unadjusted overnight price gaps indicating splits or bonus issues,0,{'anomaly_dates': []}
 timezone_inconsistency,True,Verify timestamps are localized to Asia/Kolkata,0,"{'detected_timezone': 'UTC+05:30', 'expected_timezone': 'Asia/Kolkata'}"
 data_gaps_during_market_hours,True,Detect consecutive intraday gaps exceeding 5 minutes,0,"{'gap_instances': 0, 'sample_gaps': []}"

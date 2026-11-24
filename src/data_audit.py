@@ -95,21 +95,40 @@ def check_missing_candles_in_session(
     start_time: str = "09:15",
     end_time: str = "15:30",
     freq: str = "1min",
+    expected_candles_per_day: int = 375,
 ) -> AuditCheckResult:
-    """4. Check for missing 1-minute bars during official NSE trading hours."""
+    """4. Check for missing 1-minute bars during official NSE continuous trading hours.
+
+    Continuous execution spans exactly 375 minutes: 09:15:00 to 15:29:59 IST (375 candles).
+    The 15:30:00 candle represents the post-market closing boundary / auction and is excluded.
+
+    Args:
+        df: Input DataFrame.
+        ts_col: Name of timestamp column.
+        start_time: Session start 'HH:MM'.
+        end_time: Session closing boundary 'HH:MM'.
+        freq: Bar frequency (default: 1min).
+        expected_candles_per_day: Expected continuous trading bars (default: 375).
+
+    Returns:
+        AuditCheckResult instance.
+    """
     if ts_col not in df.columns:
         return AuditCheckResult("missing_candles", False, "Timestamp column missing", 1)
     ts = pd.to_datetime(df[ts_col])
     days = ts.dt.date.unique()
-    expected_candles_per_day = 376  # 09:15 to 15:30 inclusive in 1-min steps is 376 bars
     missing_by_day = {}
     total_missing = 0
 
     for day in days:
         day_ts = ts[ts.dt.date == day]
-        actual_count = len(day_ts)
-        # Expected count in regular market hours
-        if actual_count < expected_candles_per_day - 5:  # Tolerance for holiday half-days
+        # Filter to continuous execution horizon: 09:15 to 15:29
+        t_start = pd.to_datetime(start_time, format="%H:%M").time()
+        t_end = pd.to_datetime(end_time, format="%H:%M").time()
+        continuous_bars = day_ts[(day_ts.dt.time >= t_start) & (day_ts.dt.time < t_end)]
+        actual_count = len(continuous_bars)
+        # Expected count in continuous market hours (375 bars)
+        if actual_count < expected_candles_per_day - 5:  # Tolerance for special holiday truncated sessions
             diff = expected_candles_per_day - actual_count
             missing_by_day[str(day)] = diff
             total_missing += diff
@@ -117,9 +136,9 @@ def check_missing_candles_in_session(
     return AuditCheckResult(
         check_name="missing_candles_in_session",
         passed=total_missing == 0,
-        description="Detect missing intraday 1-minute intervals during regular session",
+        description=f"Detect missing continuous 1-minute intervals (expected {expected_candles_per_day} bars/day, 09:15-15:29)",
         issue_count=total_missing,
-        details={"total_missing_candles": total_missing, "days_with_gaps": missing_by_day},
+        details={"total_missing_candles": total_missing, "expected_per_day": expected_candles_per_day, "days_with_gaps": missing_by_day},
     )
 
 

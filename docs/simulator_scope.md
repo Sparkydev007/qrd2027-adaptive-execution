@@ -19,11 +19,12 @@ The simulator provides a controlled, reproducible, point-in-time microstructural
 - **Base Resolution:** 1-minute discrete simulation steps ($t = 1, 2, \dots, 375$).
 - **Sub-Minute Discretization:** For order placement and cancellation dynamics, child slices operate at 1-minute decision boundaries.
 
-## 4. Trading Session Definition
+## 4. Trading Session Definition & 375-Minute Horizon
 - **Exchange:** National Stock Exchange of India (NSE).
-- **Trading Hours:** Regular market trading session from 09:15:00 IST to 15:30:00 IST.
-- **Session Duration:** 375 continuous minutes.
-- **Exclusions:** Pre-open auction (09:00–09:15 IST) and post-close closing auction (15:30–16:00 IST) are excluded from the continuous execution horizon.
+- **Continuous Trading Hours:** 09:15:00 IST to 15:29:59 IST.
+- **Session Duration:** Exactly 375 discrete 1-minute execution intervals ($t = 0, 1, \dots, 374$).
+- **Boundary Candle Exclusion:** The 15:30:00 timestamp candle marks the boundary close of continuous trading and the commencement of the closing auction (15:30–16:00 IST). It is strictly excluded from continuous parent-order execution intervals.
+- **Session Exclusions:** Pre-open discovery auction (09:00–09:15 IST) and closing price calculation auction (15:30–16:00 IST) are outside the continuous execution horizon.
 
 ## 5. Parent-Order Specification
 - **Direction:** Buy (programmable for Sell; symmetry verified).
@@ -75,25 +76,25 @@ For passive child orders placed in the queue, cancellation occurs:
 - Passive orders are modeled as joining the queue at the end of the prevailing visible depth $D_t$.
 - Fill probability is strictly non-lookahead, conditioned solely on interval volume and depth available at placement.
 
-## 12. Spread Model
-Instantaneous spread $S_t$ is modeled as a function of baseline tick size, price level, and local volatility:
+## 12. Spread Simulation Assumption
+Instantaneous spread $S_t$ is a parameterized simulation assumption modeled as a function of baseline tick size, price level, and local volatility (not directly extracted from Level-2 tick feeds):
 $$S_t = \max\left( \delta_{\text{tick}},\, P_t \times \left( \bar{s}_{\text{bps}} \times 10^{-4} \right) \times \left( \frac{\sigma_t}{\bar{\sigma}} \right)^{\beta_s} \right)$$
-where default $\bar{s}_{\text{bps}} = 5.0$ bps and $\beta_s = 0.5$.
+where default baseline $\bar{s}_{\text{bps}} = 5.0$ bps and $\beta_s = 0.5$.
 
-## 13. Depth Model
-Instantaneous book depth $D_t$ at best quotes is calibrated to empirical volume:
+## 13. Depth Simulation Assumption
+Instantaneous book depth $D_t$ at best quotes is a simulation assumption parameterized as an empirical volume multiple:
 $$D_t = \lambda_d \cdot V_t$$
 where default multiplier $\lambda_d = 0.05$ (5% of interval volume visible at top-of-book).
 
-## 14. Temporary-Impact Model
-Square-root temporary impact function:
+## 14. Temporary-Impact Simulation Assumption
+Temporary price impact is modeled using the classical Almgren-Chriss square-root simulation assumption:
 $$\Delta P_t^{\text{temp}} = \eta \cdot \sigma_t \cdot \left(\frac{q_t}{V_t}\right)^{0.5}$$
-Calibrated default $\eta = 0.50$.
+Calibrated default assumption $\eta = 0.50$, $\alpha = 0.50$.
 
-## 15. Permanent-Impact Model
-Linear permanent impact with cumulative persistence:
+## 15. Permanent-Impact Simulation Assumption
+Permanent price impact is modeled using a linear simulation assumption with cumulative persistence:
 $$\Delta P_t^{\text{perm}} = \gamma \cdot \sigma_t \cdot \left(\frac{q_t}{V_t}\right)$$
-Calibrated default fraction $\gamma = 0.10$.
+Calibrated default assumption fraction $\gamma = 0.10$.
 
 ## 16. Inventory Constraints
 - Initial inventory: $Q_0 = \text{Target Volume}$.
@@ -106,12 +107,17 @@ To prevent unrealistic market absorption:
 $$q_t \le \rho_{\max} \cdot V_t$$
 where $\rho_{\max} = 0.20$ (20% of interval volume).
 
-## 18. Transaction-Cost Model
-Standard Indian institutional fee model configured at 5.0 bps baseline, or itemized:
-- Brokerage: 1.5 bps
-- STT / Taxes: 2.5–10.0 bps
-- Exchange & Regulatory: 0.35 bps
-- GST: 18% on fees.
+## 18. Transaction-Cost Model & Programmatic Schedule
+Standard Indian cash equity statutory schedule with programmatically calculated itemized components:
+- **Brokerage fee:** 1.500 bps
+- **Exchange turnover charges (NSE Cash):** 0.325 bps
+- **SEBI turnover charges:** 0.010 bps
+- **Goods and Services Tax (GST, 18% on brokerage + exchange + SEBI):** $0.18 \times (1.50 + 0.325 + 0.01) = 0.3303$ bps
+- **Stamp duty (buy delivery):** 1.500 bps
+- **Securities Transaction Tax (STT):** 2.500 bps
+- **Total Programmatic Itemized Cost:**
+  $$\text{Total}_{\text{itemized}} = 1.50 + 0.325 + 0.01 + 0.3303 + 1.50 + 2.50 = 6.1653\text{ bps}$$
+- **Configurable Standard Model:** Flat 5.0 bps baseline comparison parameter.
 
 ## 19. Regime Definitions
 Regimes are classified via historical rolling 20-day realized volatility percentiles:

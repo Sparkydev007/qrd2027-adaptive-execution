@@ -1,6 +1,6 @@
 {
   "file_path": "C:\\Users\\Prathmesh Bunde\\qrd2027_adaptive_execution\\data\\raw\\sample_RELIANCE_1min.csv",
-  "total_records": 7520,
+  "total_records": 7500,
   "unique_trading_days": 20,
   "all_passed": false,
   "checks": [
@@ -35,10 +35,11 @@
     {
       "check_name": "missing_candles_in_session",
       "passed": true,
-      "description": "Detect missing intraday 1-minute intervals during regular session",
+      "description": "Detect missing continuous 1-minute intervals (expected 375 bars/day, 09:15-15:29)",
       "issue_count": 0,
       "details": {
         "total_missing_candles": 0,
+        "expected_per_day": 375,
         "days_with_gaps": {}
       }
     },
@@ -89,7 +90,7 @@
       "issue_count": 0,
       "details": {
         "extreme_count": 0,
-        "max_1min_abs_log_return": 0.002319564479400556
+        "max_1min_abs_log_return": 0.002167575237053642
       }
     },
     {
@@ -108,7 +109,7 @@
       "description": "Ensure Average Daily Volume >= 100,000 shares",
       "issue_count": 0,
       "details": {
-        "estimated_adv": 827237.4,
+        "estimated_adv": 825213.5,
         "min_adv_threshold": 100000
       }
     },
@@ -143,7 +144,7 @@
     }
   ],
   "summary": {
-    "total_records": 7520,
+    "total_records": 7500,
     "unique_days": 20,
     "total_checks": 14,
     "passed_checks": 13,

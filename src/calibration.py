@@ -39,14 +39,29 @@ class VolatilityCalibration:
 
 
 @dataclass
-class MicrostructureCalibration:
-    spread_method: str
-    baseline_spread_bps: float
-    depth_multiplier: float
-    temporary_impact_exponent: float
-    temporary_impact_eta: float
-    permanent_impact_fraction_gamma: float
+class MicrostructureSimulationAssumptions:
+    """Simulation assumptions for market microstructure parameters.
+
+    NOTE: Spread, depth, and impact parameters are simulation assumptions based on theoretical
+    models (e.g. Almgren-Chriss square-root impact law) and market conventions, NOT directly
+    fitted from proprietary Level-2/Level-3 order book tick feeds.
+    """
+    assumed_spread_method: str
+    assumed_baseline_spread_bps: float
+    assumed_depth_multiplier: float
+    assumed_temporary_impact_exponent: float
+    assumed_temporary_impact_eta: float
+    assumed_permanent_impact_fraction_gamma: float
     statutory_transaction_cost_bps: float
+    transaction_cost_schedule: Dict[str, float] = field(default_factory=dict)
+    assumption_note: str = (
+        "Microstructure parameters are calibrated simulation assumptions based on theoretical "
+        "formulations (Almgren-Chriss) and empirical baseline values, not fitted Level-2 tick logs."
+    )
+
+
+# Alias for backwards compatibility
+MicrostructureCalibration = MicrostructureSimulationAssumptions
 
 
 @dataclass
@@ -60,11 +75,18 @@ class CalibrationReport:
     median_daily_volume: float
     volume_profile: VolumeProfile
     volatility: VolatilityCalibration
-    microstructure: MicrostructureCalibration
+    simulation_assumptions: MicrostructureSimulationAssumptions
     metadata: Dict[str, Any] = field(default_factory=dict)
 
+    @property
+    def microstructure(self) -> MicrostructureSimulationAssumptions:
+        """Convenience alias for simulation assumptions."""
+        return self.simulation_assumptions
+
     def to_dict(self) -> Dict[str, Any]:
-        return asdict(self)
+        d = asdict(self)
+        d["microstructure"] = asdict(self.simulation_assumptions)
+        return d
 
 
 def estimate_average_daily_volume(
@@ -370,34 +392,66 @@ def estimate_permanent_impact_parameters(
 def estimate_transaction_cost_schedule(
     config: Optional[AppConfig] = None,
     baseline_bps: float = 5.0,
+    brokerage_bps: float = 1.50,
+    exchange_charges_bps: float = 0.325,
+    sebi_turnover_bps: float = 0.01,
+    stamp_duty_bps: float = 1.50,
+    stt_bps: float = 2.50,
 ) -> Dict[str, float]:
     """11. Formulate transaction cost assumptions reflecting Indian cash equity structure.
 
-    Indian cash equity institutional schedule breakdown:
-    - Brokerage: 1.5 bps
-    - STT (delivery buy/sell): 10.0 bps / Intraday: 2.5 bps
-    - Exchange turnover fee (NSE): 0.325 bps
-    - SEBI charges: 0.01 bps
-    - Stamp duty (buy): 1.5 bps
-    - GST: 18% on fees ~ 0.33 bps
+    All components are parameterized and the total itemized cost is computed programmatically:
+    - Brokerage: 1.50 bps
+    - Exchange turnover fee (NSE Cash): 0.325 bps
+    - SEBI turnover charges: 0.01 bps
+    - GST (18% applied strictly to taxable services: brokerage + exchange + SEBI charges):
+        gst_bps = round(0.18 * (brokerage + exchange + sebi), 4) = 0.3303 bps
+    - Stamp duty (buy-side delivery): 1.50 bps
+    - Securities Transaction Tax (STT): 2.50 bps
+
+    Total cost is calculated programmatically as the exact sum of all components:
+        total_itemized_bps = brokerage + exchange + sebi + gst + stamp_duty + stt
+        = 1.50 + 0.325 + 0.01 + 0.3303 + 1.50 + 2.50 = 6.1653 bps
 
     Args:
         config: Application configuration.
         baseline_bps: Configured baseline round-turn cost.
+        brokerage_bps: Brokerage execution fee in bps (default: 1.50).
+        exchange_charges_bps: NSE exchange turnover charge in bps (default: 0.325).
+        sebi_turnover_bps: SEBI turnover charge in bps (default: 0.01).
+        stamp_duty_bps: Statutory stamp duty in bps (default: 1.50).
+        stt_bps: Securities Transaction Tax in bps (default: 2.50).
 
     Returns:
-        Dictionary of cost rates in basis points.
+        Dictionary of cost rates in basis points with programmatically calculated total.
     """
     statutory_bps = config.calibration.transaction_cost_bps if config else baseline_bps
+
+    # Programmatic GST calculation (18% on taxable services only, exempting STT and Stamp Duty)
+    taxable_services_bps = brokerage_bps + exchange_charges_bps + sebi_turnover_bps
+    gst_bps = round(0.18 * taxable_services_bps, 4)
+
+    # Programmatic sum of all cost components
+    components = [
+        brokerage_bps,
+        exchange_charges_bps,
+        sebi_turnover_bps,
+        gst_bps,
+        stamp_duty_bps,
+        stt_bps,
+    ]
+    total_itemized_bps = round(float(sum(components)), 4)
+
     return {
         "configured_baseline_bps": float(statutory_bps),
-        "brokerage_bps": 1.50,
-        "stt_intraday_bps": 2.50,
-        "exchange_charges_bps": 0.325,
-        "sebi_turnover_bps": 0.01,
-        "stamp_duty_bps": 1.50,
-        "gst_bps": 0.33,
-        "total_itemized_bps": 5.665,
+        "brokerage_bps": float(brokerage_bps),
+        "exchange_charges_bps": float(exchange_charges_bps),
+        "sebi_turnover_bps": float(sebi_turnover_bps),
+        "taxable_services_bps": float(round(taxable_services_bps, 4)),
+        "gst_bps": float(gst_bps),
+        "stamp_duty_bps": float(stamp_duty_bps),
+        "stt_bps": float(stt_bps),
+        "total_itemized_bps": float(total_itemized_bps),
     }
 
 
@@ -451,14 +505,15 @@ def generate_calibration_summary(
     perm_impact = estimate_permanent_impact_parameters(cfg)
     tx_costs = estimate_transaction_cost_schedule(cfg)
 
-    micro_calib = MicrostructureCalibration(
-        spread_method=spread_params["method"],
-        baseline_spread_bps=spread_params["baseline_spread_bps"],
-        depth_multiplier=depth_params["multiplier"],
-        temporary_impact_exponent=temp_impact["exponent_alpha"],
-        temporary_impact_eta=temp_impact["coefficient_eta"],
-        permanent_impact_fraction_gamma=perm_impact["fraction_gamma"],
+    micro_assumptions = MicrostructureSimulationAssumptions(
+        assumed_spread_method=spread_params["method"],
+        assumed_baseline_spread_bps=spread_params["baseline_spread_bps"],
+        assumed_depth_multiplier=depth_params["multiplier"],
+        assumed_temporary_impact_exponent=temp_impact["exponent_alpha"],
+        assumed_temporary_impact_eta=temp_impact["coefficient_eta"],
+        assumed_permanent_impact_fraction_gamma=perm_impact["fraction_gamma"],
         statutory_transaction_cost_bps=tx_costs["configured_baseline_bps"],
+        transaction_cost_schedule=tx_costs,
     )
 
     ts = pd.to_datetime(df["timestamp"])
@@ -475,11 +530,14 @@ def generate_calibration_summary(
         median_daily_volume=adv_dict["adv_median"],
         volume_profile=vol_profile,
         volatility=vol_calib,
-        microstructure=micro_calib,
+        simulation_assumptions=micro_assumptions,
         metadata={
             "annualization_factor": float(np.sqrt(375 * 250)),
             "market_hours": f"{cfg.data.market_hours.start}-{cfg.data.market_hours.end}",
+            "execution_horizon_minutes": 375,
+            "continuous_interval": "09:15-15:29",
             "source": cfg.data.source,
+            "simulation_assumptions_relabeled": True,
         },
     )
 

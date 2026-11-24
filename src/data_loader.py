@@ -121,32 +121,44 @@ def filter_market_hours(
     start_time: str = "09:15",
     end_time: str = "15:30",
     timestamp_col: str = "timestamp",
+    exclude_boundary_close: bool = True,
 ) -> pd.DataFrame:
-    """Filter records to regular trading hours inclusive of start and end.
+    """Filter records to regular trading hours.
 
-    In the NSE cash equity market, regular continuous trading runs 09:15 to 15:30 IST.
+    In the NSE cash equity market, continuous execution runs for exactly 375 minutes:
+    from 09:15:00 to 15:29:59 IST (candles timestamped 09:15 through 15:29).
+    The 15:30:00 candle represents the post-market closing boundary / closing auction
+    and is excluded from the continuous execution horizon when exclude_boundary_close=True.
 
     Args:
         df: Input DataFrame with parsed timestamp column.
         start_time: Market opening time string 'HH:MM'.
-        end_time: Market closing time string 'HH:MM'.
+        end_time: Market closing boundary string 'HH:MM'.
         timestamp_col: Name of timestamp column.
+        exclude_boundary_close: If True, strictly excludes the 15:30 boundary candle
+            so that each session contains exactly 375 1-minute execution intervals (09:15-15:29).
 
     Returns:
-        Filtered DataFrame containing only regular trading hours.
+        Filtered DataFrame containing only regular continuous trading hours.
     """
     df = df.copy()
     times = df[timestamp_col].dt.time
     t_start = pd.to_datetime(start_time, format="%H:%M").time()
     t_end = pd.to_datetime(end_time, format="%H:%M").time()
 
-    mask = (times >= t_start) & (times <= t_end)
+    if exclude_boundary_close:
+        # Strictly before closing boundary (09:15 to 15:29 inclusive) -> exactly 375 minutes
+        mask = (times >= t_start) & (times < t_end)
+    else:
+        mask = (times >= t_start) & (times <= t_end)
+
     initial_len = len(df)
     df_filtered = df[mask].copy()
     logger.debug(
-        "Market hours filter (%s-%s): kept %d of %d rows (%d dropped).",
+        "Market hours filter (%s-%s, exclude_boundary=%s): kept %d of %d rows (%d dropped).",
         start_time,
         end_time,
+        exclude_boundary_close,
         len(df_filtered),
         initial_len,
         initial_len - len(df_filtered),
@@ -200,11 +212,13 @@ def handle_missing_candles(
     start_time: str = "09:15",
     end_time: str = "15:30",
     timestamp_col: str = "timestamp",
+    session_bars: int = 375,
 ) -> pd.DataFrame:
     """Detect and regularize missing 1-minute intraday intervals per trading day.
 
     Forward-fills closing prices and sets zero volume for non-traded intervals
     to ensure stationary discrete time steps for simulation.
+    Constructs exactly session_bars (375) intervals starting at start_time (09:15 to 15:29).
 
     Args:
         df: Input DataFrame.
@@ -212,6 +226,7 @@ def handle_missing_candles(
         start_time: Daily session start 'HH:MM'.
         end_time: Daily session end 'HH:MM'.
         timestamp_col: Name of timestamp column.
+        session_bars: Number of executable 1-minute intervals (default: 375).
 
     Returns:
         Regularized DataFrame with complete intraday time grid per session.
@@ -227,8 +242,7 @@ def handle_missing_candles(
     for day in days:
         day_str = str(day)
         s_ts = pd.to_datetime(f"{day_str} {start_time}:00").tz_localize(tz)
-        e_ts = pd.to_datetime(f"{day_str} {end_time}:00").tz_localize(tz)
-        day_grid = pd.date_range(start=s_ts, end=e_ts, freq=frequency, tz=tz)
+        day_grid = pd.date_range(start=s_ts, periods=session_bars, freq=frequency, tz=tz)
         full_grids.append(pd.DataFrame({timestamp_col: day_grid}))
 
     complete_grid = pd.concat(full_grids, ignore_index=True)
