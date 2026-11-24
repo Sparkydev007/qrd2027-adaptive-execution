@@ -86,25 +86,43 @@ def test_estimate_volatility_percentiles(multi_day_ohlcv_df):
 
 
 def test_transaction_cost_schedule_sum_consistency():
-    """Test 7: Verify total transaction cost programmatically equals the exact sum of components."""
+    """Test 7: Verify total transaction cost programmatically equals the exact sum of components for buy and sell."""
     schedule = estimate_transaction_cost_schedule()
 
-    # Sum of itemized components
-    expected_sum = (
+    # Buy-side intraday expected sum: brokerage + exchange + sebi + gst + stamp duty (0.30 bps)
+    expected_buy_sum = (
         schedule["brokerage_bps"]
         + schedule["exchange_charges_bps"]
         + schedule["sebi_turnover_bps"]
         + schedule["gst_bps"]
-        + schedule["stamp_duty_bps"]
-        + schedule["stt_bps"]
+        + schedule["buy_side_stamp_duty_bps"]
     )
+    assert np.isclose(schedule["buy_side_total_bps"], expected_buy_sum, atol=1e-5)
+    assert np.isclose(schedule["buy_side_total_bps"], 2.4653, atol=1e-4)
 
-    # Programmatic total must strictly match the component sum
-    assert np.isclose(schedule["total_itemized_bps"], expected_sum, atol=1e-5)
+    # Sell-side intraday expected sum: brokerage + exchange + sebi + gst + STT (2.50 bps)
+    expected_sell_sum = (
+        schedule["brokerage_bps"]
+        + schedule["exchange_charges_bps"]
+        + schedule["sebi_turnover_bps"]
+        + schedule["gst_bps"]
+        + schedule["sell_side_stt_bps"]
+    )
+    assert np.isclose(schedule["sell_side_total_bps"], expected_sell_sum, atol=1e-5)
+    assert np.isclose(schedule["sell_side_total_bps"], 4.6653, atol=1e-4)
+
+    # Round-turn expected sum: buy + sell
+    assert np.isclose(schedule["round_turn_total_bps"], schedule["buy_side_total_bps"] + schedule["sell_side_total_bps"], atol=1e-5)
+    assert np.isclose(schedule["round_turn_total_bps"], 7.1306, atol=1e-4)
 
     # Verify GST is 18% of taxable services (brokerage + exchange charges + SEBI charges)
     taxable = schedule["brokerage_bps"] + schedule["exchange_charges_bps"] + schedule["sebi_turnover_bps"]
     assert np.isclose(schedule["gst_bps"], round(0.18 * taxable, 4), atol=1e-5)
+
+    # Verify individual configuration overrides
+    custom = estimate_transaction_cost_schedule(brokerage_bps=2.0, stamp_duty_bps=0.5)
+    assert custom["brokerage_bps"] == 2.0
+    assert custom["buy_side_stamp_duty_bps"] == 0.5
 
 
 def test_estimate_microstructure_parameters():
@@ -120,8 +138,9 @@ def test_estimate_microstructure_parameters():
     assert depth_p["multiplier"] == 0.05
     assert temp_p["exponent_alpha"] == 0.5
     assert perm_p["fraction_gamma"] == 0.10
-    assert costs["configured_baseline_bps"] == 5.0
-    assert costs["total_itemized_bps"] > 0
+    assert costs["configured_baseline_bps"] == cfg.calibration.transaction_cost_bps
+    assert costs["buy_side_total_bps"] > 0
+    assert costs["sell_side_total_bps"] > 0
 
 
 def test_generate_and_save_calibration_report(multi_day_ohlcv_df):

@@ -68,6 +68,53 @@ class ImpactModelConfig:
 
 
 @dataclass(frozen=True)
+class TransactionCostsConfig:
+    brokerage_bps: float = 1.50
+    exchange_charges_bps: float = 0.325
+    sebi_charges_bps: float = 0.01
+    gst_rate: float = 0.18
+    intraday_stamp_duty_bps: float = 0.30
+    delivery_stamp_duty_bps: float = 1.50
+    intraday_stt_sell_bps: float = 2.50
+    delivery_stt_bps: float = 10.00
+    is_intraday: bool = True
+
+    @property
+    def taxable_services_bps(self) -> float:
+        return self.brokerage_bps + self.exchange_charges_bps + self.sebi_charges_bps
+
+    @property
+    def gst_bps(self) -> float:
+        return round(self.gst_rate * self.taxable_services_bps, 4)
+
+    @property
+    def buy_side_intraday_bps(self) -> float:
+        return round(
+            self.brokerage_bps
+            + self.exchange_charges_bps
+            + self.sebi_charges_bps
+            + self.gst_bps
+            + self.intraday_stamp_duty_bps,
+            4,
+        )
+
+    @property
+    def sell_side_intraday_bps(self) -> float:
+        return round(
+            self.brokerage_bps
+            + self.exchange_charges_bps
+            + self.sebi_charges_bps
+            + self.gst_bps
+            + self.intraday_stt_sell_bps,
+            4,
+        )
+
+    @property
+    def round_turn_intraday_bps(self) -> float:
+        return round(self.buy_side_intraday_bps + self.sell_side_intraday_bps, 4)
+
+
+@dataclass(frozen=True)
 class CalibrationConfig:
     volatility_window: int
     volume_profile_buckets: int
@@ -75,6 +122,12 @@ class CalibrationConfig:
     depth_assumption: DepthAssumptionConfig
     impact_model: ImpactModelConfig
     transaction_cost_bps: float
+    transaction_costs: TransactionCostsConfig = field(default_factory=TransactionCostsConfig)
+
+    @property
+    def simulation_assumptions(self) -> CalibrationConfig:
+        """Alias for simulation assumptions."""
+        return self
 
 
 @dataclass(frozen=True)
@@ -200,6 +253,17 @@ def load_config(config_path: Optional[str | Path] = None) -> AppConfig:
             ),
         ),
         transaction_cost_bps=float(data["calibration"]["transaction_cost_bps"]),
+        transaction_costs=TransactionCostsConfig(
+            brokerage_bps=float(data["calibration"].get("transaction_costs", {}).get("brokerage_bps", 1.50)),
+            exchange_charges_bps=float(data["calibration"].get("transaction_costs", {}).get("exchange_charges_bps", 0.325)),
+            sebi_charges_bps=float(data["calibration"].get("transaction_costs", {}).get("sebi_charges_bps", 0.01)),
+            gst_rate=float(data["calibration"].get("transaction_costs", {}).get("gst_rate", 0.18)),
+            intraday_stamp_duty_bps=float(data["calibration"].get("transaction_costs", {}).get("intraday_stamp_duty_bps", 0.30)),
+            delivery_stamp_duty_bps=float(data["calibration"].get("transaction_costs", {}).get("delivery_stamp_duty_bps", 1.50)),
+            intraday_stt_sell_bps=float(data["calibration"].get("transaction_costs", {}).get("intraday_stt_sell_bps", 2.50)),
+            delivery_stt_bps=float(data["calibration"].get("transaction_costs", {}).get("delivery_stt_bps", 10.00)),
+            is_intraday=bool(data["calibration"].get("transaction_costs", {}).get("is_intraday", True)),
+        ),
     )
 
     execution_cfg = ExecutionConfig(

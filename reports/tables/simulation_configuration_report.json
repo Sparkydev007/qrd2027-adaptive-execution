@@ -1,0 +1,35 @@
+{
+  "project": "qrd2027_adaptive_execution",
+  "execution_horizon_minutes": 375,
+  "continuous_hours": "09:15 to 15:29 IST",
+  "parent_order_sizes_adv": [
+    0.005,
+    0.01,
+    0.02
+  ],
+  "max_participation_rate": 0.2,
+  "universe_calibrated": [
+    "RELIANCE",
+    "HDFCBANK",
+    "TCS"
+  ],
+  "simulation_assumptions": {
+    "spread_method": "fixed_bps",
+    "baseline_spread_bps": 5.0,
+    "depth_multiplier": 0.05,
+    "temporary_impact_exponent": 0.5,
+    "temporary_impact_eta": 0.5,
+    "permanent_impact_fraction": 0.1,
+    "buy_side_intraday_transaction_cost_bps": 2.4653,
+    "itemized_transaction_costs": {
+      "brokerage_bps": 1.5,
+      "exchange_charges_bps": 0.325,
+      "sebi_charges_bps": 0.01,
+      "gst_bps": 0.3303,
+      "stamp_duty_bps": 0.3,
+      "stt_buy_bps": 0.0
+    }
+  },
+  "total_simulations_executed": 45,
+  "random_seed": 42
+}

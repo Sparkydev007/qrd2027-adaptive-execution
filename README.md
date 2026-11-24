@@ -138,23 +138,27 @@ Or open the interactive Jupyter notebook:
 jupyter lab notebooks/01_data_audit.ipynb
 ```
 
-## 13. How to Run Calibration
+## 13. How to Run Calibration & Simulation
 Execute the empirical calibration pipeline against historical clean data:
 ```bash
 python -c "from src.calibration import run_calibration_pipeline; run_calibration_pipeline('data/processed/RELIANCE_1min.parquet')"
 ```
-Results are saved directly to `reports/tables/calibration_report.json`.
+Execute the complete multi-stock execution simulator across all 5 policies (TWAP, VWAP, Naive Aggressive, POV, Liquidity-Adaptive):
+```bash
+python -m src.run_simulation
+```
+Results and publication charts are saved directly to `reports/tables/` and `reports/figures/`.
 
 ## 14. How to Reproduce Results
 All experimental procedures are deterministic and configuration-driven:
 1. Inspect or modify execution parameters in `config/config.yaml`.
-2. Run test suite: `pytest -v tests/`
-3. Execute the audit and calibration pipelines.
-4. Run batch simulation runs across all 100 paths per regime with fixed random seeds (`seed: 42`).
+2. Run test suite: `pytest -v tests/` (all 36 unit tests pass).
+3. Execute the simulation engine: `python -m src.run_simulation`
+4. Inspect interactive notebooks: `jupyter lab notebooks/`
 
 ## 15. Important Limitations
 1. **Calibration Granularity:** Calibrated on 1-minute OHLCV data, not Level-2/Level-3 direct feed tick logs.
-2. **Synthetic Microstructure:** Queue priority is simulated using stochastic point-in-time fills rather than deterministic exchange matching engine order matching logs.
+2. **Synthetic Microstructure:** Queue priority is simulated using stochastic point-in-time fills and queue depth absorption rather than deterministic exchange matching engine order matching logs.
 3. **No Latency Modeling:** Colocation network transport latency (<100 microseconds) is abstracted away; simulation operates on discrete algorithmic decision cycles.
 4. **Passive Adversity:** Adverse selection for passive limit orders is parameterized via volatility and spread decay rather than counterparty tag identification.
 
@@ -163,9 +167,9 @@ All experimental procedures are deterministic and configuration-driven:
 
 ## 17. Research Roadmap (Days 1–7)
 - **Day 1 (Completed):** Project scaffold, YAML configuration, research design docs, data loader, comprehensive 14-point data audit, calibration skeleton, unit tests, and audit notebook.
-- **Day 2:** Feature engineering (order imbalance proxies, volatility regimes, volume profile curves) and synthetic/empirical data pipeline validation.
-- **Day 3:** Discrete-time limit order book simulator, queue approximation, and fill simulator engine.
-- **Day 4:** Almgren-Chriss market impact engine (temporary square-root, permanent linear, Indian transaction fee schedule).
-- **Day 5:** Baseline execution algorithms (TWAP, VWAP, POV, Naive Aggressive) and rule-based adaptive controller.
-- **Day 6:** Monte Carlo simulation engine, regime stress testing (calm, normal, stressed), and statistical hypothesis testing.
+- **Day 2 (Completed):** Discrete-time limit order book simulator, queue-position approximation, Almgren-Chriss market impact engine (square-root temporary, linear permanent with full persistence), 5 execution policies (TWAP, VWAP, Naive Aggressive, POV, Liquidity-Adaptive), 3-stock universe calibration (RELIANCE, HDFCBANK, TCS), simulation results, and 4 publication-quality 300 DPI figures.
+- **Day 3:** Advanced queue dynamics, adverse selection hazard rates, cancellation ratio calibration, and fill-probability empirical validation.
+- **Day 4:** Multi-day Monte Carlo path generation, stochastic drift scenarios, and non-linear market-impact decay kernels.
+- **Day 5:** Sensitivity analysis across participation caps (10% to 30%), impact parameter perturbations, and cross-asset beta clustering.
+- **Day 6:** Statistical hypothesis testing ($H_1$–$H_4$ paired t-tests, Wilcoxon signed-rank tests), bootstrap confidence intervals, and regime stress testing.
 - **Day 7:** Production of high-resolution publication charts, LaTeX tables, and A0 portrait poster assets for QRD 2027.

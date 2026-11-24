@@ -1,6 +1,6 @@
 project:
   name: qrd2027_adaptive_execution
-  version: 0.1.0
+  version: 0.2.0
   description: Liquidity-adaptive optimal execution simulation for Indian equities
   research_type: simulation_based_execution_research
 
@@ -21,9 +21,9 @@ universe:
   stocks:
     - RELIANCE
     - HDFCBANK
+    - TCS
     - ICICIBANK
     - INFY
-    - TCS
     - SBIN
     - AXISBANK
     - KOTAKBANK
@@ -35,6 +35,28 @@ universe:
 calibration:
   volatility_window: 20
   volume_profile_buckets: 13
+  simulation_assumptions:
+    spread:
+      method: fixed_bps
+      value_bps: 5.0
+    depth:
+      method: volume_multiple
+      multiplier: 0.05
+    impact_model:
+      temporary_impact_exponent: 0.5
+      temporary_impact_eta: 0.5
+      permanent_impact_fraction: 0.10
+  transaction_costs:
+    brokerage_bps: 1.50
+    exchange_charges_bps: 0.325
+    sebi_charges_bps: 0.01
+    gst_rate: 0.18
+    intraday_stamp_duty_bps: 0.30  # Buy-side intraday statutory stamp duty (0.003%)
+    delivery_stamp_duty_bps: 1.50  # Buy-side delivery statutory stamp duty (0.015%)
+    intraday_stt_sell_bps: 2.50   # Sell-side intraday STT (0.025%)
+    delivery_stt_bps: 10.00       # Delivery STT on buy and sell (0.10%)
+    is_intraday: true
+  # Backwards compatibility fields
   spread_assumption:
     method: fixed_bps
     value_bps: 5.0
@@ -44,7 +66,7 @@ calibration:
   impact_model:
     temporary_impact_exponent: 0.5
     permanent_impact_fraction: 0.10
-  transaction_cost_bps: 5.0
+  transaction_cost_bps: 2.4653  # Calibrated buy-side intraday total
 
 execution:
   parent_order_sizes_adv:
@@ -63,15 +85,26 @@ evaluation:
     - vwap
     - naive_aggressive
     - percentage_of_volume
+    - adaptive
   metrics:
+    - arrival_price
+    - interval_vwap
     - implementation_shortfall
-    - market_impact
-    - fill_rate
-    - turnover
-    - inventory_variance
-    - max_inventory
     - slippage_vs_arrival
     - slippage_vs_interval_vwap
+    - temporary_market_impact
+    - permanent_market_impact
+    - average_spread_paid
+    - fill_rate
+    - turnover
+    - inventory
+    - inventory_variance
+    - max_inventory
+    - execution_completion_rate
+    - participation_rate
+    - transaction_cost_adjusted_cost
+    - performance_by_volatility_regime
+    - performance_by_liquidity_regime
 
 simulation:
   random_seed: 42

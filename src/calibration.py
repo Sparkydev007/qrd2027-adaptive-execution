@@ -391,67 +391,96 @@ def estimate_permanent_impact_parameters(
 
 def estimate_transaction_cost_schedule(
     config: Optional[AppConfig] = None,
-    baseline_bps: float = 5.0,
-    brokerage_bps: float = 1.50,
-    exchange_charges_bps: float = 0.325,
-    sebi_turnover_bps: float = 0.01,
-    stamp_duty_bps: float = 1.50,
-    stt_bps: float = 2.50,
+    baseline_bps: float = 2.4653,
+    brokerage_bps: Optional[float] = None,
+    exchange_charges_bps: Optional[float] = None,
+    sebi_turnover_bps: Optional[float] = None,
+    stamp_duty_bps: Optional[float] = None,
+    stt_sell_bps: Optional[float] = None,
+    gst_rate: float = 0.18,
 ) -> Dict[str, float]:
     """11. Formulate transaction cost assumptions reflecting Indian cash equity structure.
 
-    All components are parameterized and the total itemized cost is computed programmatically:
+    Separates buy-side and sell-side intraday statutory costs and calculates all totals programmatically:
     - Brokerage: 1.50 bps
     - Exchange turnover fee (NSE Cash): 0.325 bps
     - SEBI turnover charges: 0.01 bps
     - GST (18% applied strictly to taxable services: brokerage + exchange + SEBI charges):
-        gst_bps = round(0.18 * (brokerage + exchange + sebi), 4) = 0.3303 bps
-    - Stamp duty (buy-side delivery): 1.50 bps
-    - Securities Transaction Tax (STT): 2.50 bps
+        gst_bps = round(gst_rate * (brokerage + exchange + sebi), 4) = 0.3303 bps
+    - Stamp duty (buy-side intraday statutory assumption): 0.30 bps (0.003%)
+    - Securities Transaction Tax (STT, sell-side intraday statutory): 2.50 bps (0.025%)
 
-    Total cost is calculated programmatically as the exact sum of all components:
-        total_itemized_bps = brokerage + exchange + sebi + gst + stamp_duty + stt
-        = 1.50 + 0.325 + 0.01 + 0.3303 + 1.50 + 2.50 = 6.1653 bps
+    Programmatic buy-side total (applicable to parent buy orders):
+        buy_side_total_bps = brokerage + exchange + sebi + gst + stamp_duty = 2.4653 bps
+
+    Programmatic sell-side total:
+        sell_side_total_bps = brokerage + exchange + sebi + gst + stt = 4.6653 bps
+
+    Programmatic round-turn total:
+        round_turn_total_bps = buy_side_total_bps + sell_side_total_bps = 7.1306 bps
 
     Args:
         config: Application configuration.
         baseline_bps: Configured baseline round-turn cost.
-        brokerage_bps: Brokerage execution fee in bps (default: 1.50).
-        exchange_charges_bps: NSE exchange turnover charge in bps (default: 0.325).
-        sebi_turnover_bps: SEBI turnover charge in bps (default: 0.01).
-        stamp_duty_bps: Statutory stamp duty in bps (default: 1.50).
-        stt_bps: Securities Transaction Tax in bps (default: 2.50).
+        brokerage_bps: Brokerage execution fee in bps.
+        exchange_charges_bps: NSE exchange turnover charge in bps.
+        sebi_turnover_bps: SEBI turnover charge in bps.
+        stamp_duty_bps: Statutory buy-side intraday stamp duty in bps (default: 0.30).
+        stt_sell_bps: Statutory sell-side intraday STT in bps (default: 2.50).
+        gst_rate: Goods and Services Tax rate (default: 0.18).
 
     Returns:
-        Dictionary of cost rates in basis points with programmatically calculated total.
+        Dictionary of cost rates in basis points with programmatically calculated buy, sell, and round-turn totals.
     """
-    statutory_bps = config.calibration.transaction_cost_bps if config else baseline_bps
+    if config is not None:
+        tc = config.calibration.transaction_costs
+        brok = brokerage_bps if brokerage_bps is not None else tc.brokerage_bps
+        exch = exchange_charges_bps if exchange_charges_bps is not None else tc.exchange_charges_bps
+        sebi = sebi_turnover_bps if sebi_turnover_bps is not None else tc.sebi_charges_bps
+        stamp = stamp_duty_bps if stamp_duty_bps is not None else tc.intraday_stamp_duty_bps
+        stt = stt_sell_bps if stt_sell_bps is not None else tc.intraday_stt_sell_bps
+        gst_r = gst_rate if gst_rate is not None else tc.gst_rate
+        statutory_bps = config.calibration.transaction_cost_bps
+    else:
+        brok = brokerage_bps if brokerage_bps is not None else 1.50
+        exch = exchange_charges_bps if exchange_charges_bps is not None else 0.325
+        sebi = sebi_turnover_bps if sebi_turnover_bps is not None else 0.01
+        stamp = stamp_duty_bps if stamp_duty_bps is not None else 0.30
+        stt = stt_sell_bps if stt_sell_bps is not None else 2.50
+        gst_r = gst_rate
+        statutory_bps = baseline_bps
 
     # Programmatic GST calculation (18% on taxable services only, exempting STT and Stamp Duty)
-    taxable_services_bps = brokerage_bps + exchange_charges_bps + sebi_turnover_bps
-    gst_bps = round(0.18 * taxable_services_bps, 4)
+    taxable_services_bps = brok + exch + sebi
+    gst_bps = round(gst_r * taxable_services_bps, 4)
 
-    # Programmatic sum of all cost components
-    components = [
-        brokerage_bps,
-        exchange_charges_bps,
-        sebi_turnover_bps,
-        gst_bps,
-        stamp_duty_bps,
-        stt_bps,
-    ]
-    total_itemized_bps = round(float(sum(components)), 4)
+    # Buy-side intraday components (STT is 0 on intraday buy)
+    buy_components = [brok, exch, sebi, gst_bps, stamp]
+    buy_side_total_bps = round(float(sum(buy_components)), 4)
+
+    # Sell-side intraday components (Stamp duty is 0 on sell side)
+    sell_components = [brok, exch, sebi, gst_bps, stt]
+    sell_side_total_bps = round(float(sum(sell_components)), 4)
+
+    # Round-turn total
+    round_turn_total_bps = round(buy_side_total_bps + sell_side_total_bps, 4)
 
     return {
         "configured_baseline_bps": float(statutory_bps),
-        "brokerage_bps": float(brokerage_bps),
-        "exchange_charges_bps": float(exchange_charges_bps),
-        "sebi_turnover_bps": float(sebi_turnover_bps),
+        "brokerage_bps": float(brok),
+        "exchange_charges_bps": float(exch),
+        "sebi_turnover_bps": float(sebi),
         "taxable_services_bps": float(round(taxable_services_bps, 4)),
         "gst_bps": float(gst_bps),
-        "stamp_duty_bps": float(stamp_duty_bps),
-        "stt_bps": float(stt_bps),
-        "total_itemized_bps": float(total_itemized_bps),
+        "stamp_duty_bps": float(stamp),
+        "stt_bps": float(stt),
+        "buy_side_stamp_duty_bps": float(stamp),
+        "sell_side_stt_bps": float(stt),
+        "buy_side_total_bps": float(buy_side_total_bps),
+        "sell_side_total_bps": float(sell_side_total_bps),
+        "round_turn_total_bps": float(round_turn_total_bps),
+        # Default applicable for parent buy order execution
+        "total_itemized_bps": float(buy_side_total_bps),
     }
 
 
